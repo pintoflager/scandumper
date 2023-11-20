@@ -1,0 +1,17 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = { path = "../common" }
+axum = { version = "0.6.20" }
+tokio = { version = "1.0", features = ["full"] }
+rust-s3 = "0.33.0"
+tracing = "0.1"
+toml = "0.8"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = {version = "1.0.188", features = ["derive"]}
+anyhow = { version = "1.0" }
