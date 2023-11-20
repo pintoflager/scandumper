@@ -1,5 +1,8 @@
 prefix = "root"
-dirs = ["source_files"]
+dirs = [
+    "source_files",
+    "other_source_files"
+]
 
 [server]
 host = "127.0.0.1"
