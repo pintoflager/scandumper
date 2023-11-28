@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+# Build release binary for x86
+x86() {
+	if [[ $1 == "server" || $1 == "updater" ]]; then
+		cross build --bin "$1" --target x86_64-unknown-linux-gnu --release --no-default-features
+	else
+		cross build --target x86_64-unknown-linux-gnu --release --no-default-features
+	fi
+}
+
+# Build release binary for arm
+arm() {
+	if [[ $1 == "server" || $1 == "updater" ]]; then
+		cross build --bin "$1" --target aarch64-unknown-linux-gnu --release --no-default-features
+	else
+		cross build --target aarch64-unknown-linux-gnu --release --no-default-features
+	fi
+}
+
+# No arguments given, build all.
+if [[ -z $1 ]]; then
+	x86 || exit 1
+	arm || exit 1
+	
+	exit
+fi
+
+# Build for intel chips
+if [[ $1 == "x86" || $1 == "intel" ]]; then
+	x86 "$2" || exit 1
+fi
+
+# Build for arm chips
+if [[ $1 == "aarch" || $1 == "arm" ]]; then
+	arm "$2" || exit 1
+fi
