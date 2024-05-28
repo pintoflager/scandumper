@@ -30,6 +30,8 @@ Try to feed your own images into it and see how it goes!
 
 Resized images can be used on your website for example. Smaller images == faster load times.
 
+Works on linux and that's all I need! Might work on mac as well.
+
 ## It scans
 
 You need `config.toml` file on the root of a directory you wish to read the images from.  
