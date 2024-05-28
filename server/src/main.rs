@@ -1,7 +1,7 @@
 use axum::body::Bytes;
-use s3::error::S3Error;
-use s3::{Bucket, Region, creds::Credentials};
-use tracing::{warn, info};
+use s3::Bucket;
+use tokio::net::TcpListener;
+use tracing::{debug, info};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use serde::Serialize;
@@ -14,7 +14,7 @@ use axum::{
     Router
 };
 
-use common::Config;
+use config::{Config, ObjectStore};
 
 
 #[derive(Clone)]
@@ -52,62 +52,57 @@ async fn main() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "server=debug".into()),
+                .unwrap_or_else(|_| "imgserver=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let (dir, config) = match Config::paths_from_args() {
-        Ok(t) => t,
-        Err(e) => panic!("Failed to resolve root dir and config file: {}", e)
-    };
-
-    let config = match Config::from_path(&config, Some(&dir)) {
+    let mut config = match Config::new() {
         Ok(c) => c,
         Err(e) => panic!("Failed to init config: {}", e),
     };
 
-    let region = Region::Custom {
-        region: config.s3.region.to_owned(),
-        endpoint: format!("http://{}:{}", config.s3.host, config.s3.port),
+    debug!("Config loaded...");
+
+    let server_config = match config.server() {
+        Ok(c) => c,
+        Err(e) => panic!("Incomplete config for server: {}", e),
     };
 
-    let credentials = Credentials::new(
-        config.s3.access_key.as_deref().or(
-            std::env::var("S3_ACCESS_KEY").ok().as_deref()
-        ),
-        config.s3.secret_key.as_deref().or(
-            std::env::var("S3_SECRET_KEY").ok().as_deref()
-        ),
-        None, None, None
-    )
-    .expect("Failed to init S3 credentials");
+    debug!("Server config loaded...");
 
-    let bucket = Bucket::new(&config.s3.bucket_name, region.clone(), credentials.clone())
-        .expect("Failed to create S3 bucket")
-        .with_path_style();
+    let export_config = match config.export() {
+        Ok(e) => e,
+        Err(e) => panic!("Incomplete config for export: {}", e),
+    };
 
-    // Poke minio to see if the bucket exists
-    if let Err(e) = bucket.list("/".to_string(), None).await {
-        match e {
-            S3Error::Http(c, s) => match c {
-                404 => {
-                    warn!("Bucket doesn't exist yet?: {} / {}", c, s);
+    debug!("Export config loaded...");
 
-                    panic!("Bucket has to be created before running the server")
-                }
-                _ => panic!("Bucket of shit: {} / {}", c, s),
-            },
-            i => panic!("Bucket of shit: {}", i),
-        }
-    }
+    let s3_store = match export_config.s3 {
+        true => {
+            let s3_config = match config.s3_mut() {
+                Ok(c) => c,
+                Err(e) => panic!("Incomplete config for S3: {}", e),
+            };
 
-    let ip = match format!("{}:{}", config.server.host, config.server.port).parse::<SocketAddr>() {
+            // Verify that our bucket exists
+            if let Err(e) = ObjectStore::init_from(s3_config, false).await {
+                panic!("Object store loading from config failed: {}", e)
+            }
+
+            debug!("S3 config loaded...");
+
+            ObjectStore::get(&s3_config).unwrap()
+        },
+        false => panic!("Server only reads objects from S3"),
+    };
+
+    let ip = match format!("{}:{}", server_config.host, server_config.port).parse::<SocketAddr>() {
         Ok(a) => a,
         Err(e) => panic!("Failed to join socket address from {:?}: {}", config.server, e),
     };
 
-    let state = ServerState { bucket };
+    let state = ServerState { bucket: s3_store.0 };
 
     // App with routes to list and read
     let app = Router::new()
@@ -116,14 +111,14 @@ async fn main() {
         .route("/s3/index/*tail", get(s3_index_handler))
         .with_state(state);
 
-    let server = axum::Server::bind(&ip)
-        .serve(app.into_make_service_with_connect_info::<SocketAddr>());
-
+    let listener = match TcpListener::bind(&ip).await {
+        Ok(l) => l,
+        Err(e) => panic!("Unable to start listener: {}", e),
+    };
+    
     info!("Listening on http://{}...", ip);
-
-    if let Err(e) = server.await {
-        panic!("Failed to run server: {}", e)
-    }
+    
+    axum::serve(listener, app).await.unwrap()
 }
 
 async fn s3_object_handler(Path(tail): Path<String>, state: State<ServerState>)
@@ -154,19 +149,14 @@ async fn s3_index_handler(Path(tail): Path<String>, state: State<ServerState>)
     let prefix = format!("{}/", tail);
 
     match state.bucket.list(prefix, delimiter).await {
-        Ok(v) => {
-            
-            // info!("resp: {:?}", v);
-            
-            Responder::success(v.into_iter()
-                .map(|i|i.common_prefixes.into_iter()
-                    .flat_map(|v|v.into_iter()
-                        .map(|p|p.prefix))
-                    .collect::<Vec<String>>())
-                .flatten()
-                .collect()
-            )
-        },
+        Ok(v) => Responder::success(v.into_iter()
+            .map(|i|i.common_prefixes.into_iter()
+                .flat_map(|v|v.into_iter()
+                    .map(|p|p.prefix))
+                .collect::<Vec<String>>())
+            .flatten()
+            .collect()
+        ),
         Err(e) => return Responder::error(vec![], e.into()),
     }
 }

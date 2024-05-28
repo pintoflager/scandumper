@@ -1,19 +1,23 @@
 [package]
-name = "updater"
+name = "import"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "scandumper"
+path = "src/main.rs"
 
 [dependencies]
-common = { path = "../common" }
-fast_image_resize = "2.7.3"
+config = { path = "../config" }
+fast_image_resize = { version = "4.0.0", features = ["image"] }
+bytemuck = "1.16.0"
+image = "0.25.1"
+imageproc = "0.25.0"
+adler = "1.0.2"
 tracing = "0.1"
-toml = "0.8"
+toml = "0.8.8"
+walkdir = "2.5.0"
+anyhow = "1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-anyhow = "1.0.75"
-image = "0.24.7"
-walkdir = "2.4.0"
-rust-s3 = "0.33.0"
 tokio = { version = "1.34.0", features = ["full"] }
-rust-crypto = "0.2.36"

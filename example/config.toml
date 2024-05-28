@@ -1,17 +1,37 @@
-prefix = "root"
-dirs = [
-    "source_files",
-    "other_source_files"
-]
+# parallel_img_max = 4
+# transform_variant = "md" # none, original, xl, lg, md, sm, xs
+
+# [resize]
+# original = 2500
+# xl = 1200
+# lg = 800
+# md = 600
+# sm = 300
+# xs = 70
+
+[import]
+include = ["source_files", "other_source_files"]
+# exclude = ["all_but_this_dir", "or_this_dir"]
+
+[export]
+prefix = "resized"
+filesystem = true
+s3 = false
 
 [server]
 host = "127.0.0.1"
 port = 9080
 
 [s3]
-host = "127.0.0.1"
-port = 9090
+bucket = "images"
+
+[s3.region.Custom]
 region = "eu-central-1"
-bucket_name = "images"
+endpoint = "http://127.0.0.1:9090"
+
+[s3.credentials]
 access_key = "minioadmin"
 secret_key = "minioadmin"
+# security_token = ""
+# session_token = ""
+# expiration = <<Rfc3339OffsetDateTime>>
