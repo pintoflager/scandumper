@@ -5,7 +5,7 @@ use super::*;
 
 
 pub fn round_from_rect(buf: &ImageBuffer<Rgba<u8>, Vec<u8>>, size: u32) -> DynamicImage {
-    // Draw a white circle on a black background that is the same size as the cropped image
+    // Draw a white circle on a transparent background that is the same size as the cropped image
     let div2 = (size / 2).try_into().unwrap();
     let mut img = RgbaImage::from_pixel(size, size, TRANSPARENT);
     

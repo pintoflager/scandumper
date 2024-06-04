@@ -295,8 +295,16 @@ s3_store: Option<ObjectStore>)
 
     // Crop image into a max sized square for transformations that expect a square image
     let (rect_side, x, y) = match img.width() >= img.height() {
-        true => (img.height(), 0, img.width() - img.height() / 2),
-        false => (img.width(), img.height() - img.width() / 2, 0)
+        true => (
+            img.height(),
+            (img.width() - img.height()) / 2,
+            0
+        ),
+        false => (
+            img.width(),
+            0,
+            (img.height() - img.width()) / 2,
+        )
     };
     
     // We cropped the input image so transformable should be updated
@@ -306,10 +314,8 @@ s3_store: Option<ObjectStore>)
     transformable.target_ext = "png";
     
     // Create dynamic square image and read its contents to buffer
-    let mut img_square = img.clone();
-    img_square.crop(x, y, rect_side, rect_side);
-
-    let img_square_buf = img_square.to_rgba8();
+    let img_square = img.clone();
+    let img_square_buf = img_square.crop_imm(x, y, rect_side, rect_side).to_rgba8();
 
     // Crop and resize 'sm' size ROUND PNG image
     let img_circle = round_from_rect(&img_square_buf, rect_side);
